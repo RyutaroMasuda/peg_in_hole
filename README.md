@@ -168,3 +168,7 @@ uv run rt_control.py log/20251128_1910_42 data/20251112_redsylinder2
     right_imgs = npz_data["right_imgs"][np.newaxis,:,80:-110,140:-50,:]
     ```
     で切り抜き
+- 20251112_redsylinder_2
+    ```
+    right_imgs = npz_data["right_imgs"][np.newaxis,:,55:-110,205:-55,:]
+    ```
