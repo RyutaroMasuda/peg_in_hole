@@ -31,21 +31,22 @@ class RTCore:
         self.right_img = None
         self.left_arm_state = None
         self.right_arm_state = None
-        # self.bridge = CvBridge()
+        self.tactile_img = None
         
         self.left_arm_msg = JointState()
         self.right_arm_msg = JointState()
         
-        self.left_arm_pub = rospy.Publisher("/teleop/left_joint_states", JointState, queue_size=1)
-        self.right_arm_pub = rospy.Publisher("/teleop/right_joint_states", JointState, queue_size=1)
+        self.left_arm_pub = rospy.Publisher("/maharo/left_arm/upperbody/online_joint_states", JointState, queue_size=1)
+        self.right_arm_pub = rospy.Publisher("/maharo/right_arm/upperbody/online_joint_states", JointState, queue_size=1)
 
         self.pred_img_pub = rospy.Publisher("/predicted_image", Image, queue_size=1)
         self.show_img_pub = rospy.Publisher("/show_image", Image, queue_size=1)
 
-        rospy.Subscriber("/maharo/upperbody_left/joint_states", JointState, self.left_arm_state_callback)
-        rospy.Subscriber("/maharo/upperbody_right/joint_states", JointState, self.right_arm_state_callback)
-        rospy.Subscriber("/zed/zed_node/left/image_rect_color", Image, self.left_img_callback)
-        rospy.Subscriber("/zed/zed_node/right/image_rect_color", Image, self.right_img_callback)
+        rospy.Subscriber("/maharo/left_arm/upperbody/joint_states", JointState, self.left_arm_state_callback)
+        rospy.Subscriber("/maharo/right_arm/upperbody/joint_states", JointState, self.right_arm_state_callback)
+        rospy.Subscriber("/zed2i/zed_node/left/image_rect_color/compressed", Image, self.left_img_callback)
+        rospy.Subscriber("/zed2i/zed_node/right/image_rect_color/compressed", Image, self.right_img_callback)
+        rospy.Subscriber("/digit/right_gripper/image_raw", Image, self.tactile_img_callback)
 
         # time.sleep(1)
 
@@ -61,9 +62,13 @@ class RTCore:
         # bridge = CvBridge()
         # _right_img = bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         _right_img = self.custom_bridge(msg)    # bridge.imgmsg_to_cv2 の代わりに使用
-        _right_img = _right_img[:,100:-100]
-        self._right_img = _right_img[100:-100,100:-50]
+        self._right_img = _right_img[55:-110,205:-55]
         self.right_img = cv2.resize(self._right_img, (64,64))
+    
+    def tactile_img_callback(self, msg):
+        _tactile_img = self.custom_bridge(msg)
+        self._tactile_img = _tactile_img[:,:]
+        self.tactile_img = cv2.resize(self._tactile_img,(64,64))
 
     def left_arm_state_callback(self, msg):
         if len(self.left_arm_msg.name) == 0:

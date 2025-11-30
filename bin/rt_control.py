@@ -34,8 +34,19 @@ from rt_core import RTCore
 
 # local
 sys.path.append("../")
-from util import Visualize, Processor, Deprocessor, RTSelector
+from utils import Visualize, Processor, Deprocessor, RTSelector
+from eipl.model import TACTILESARNN
 
+parser = argparse.ArgumentParser()
+parser.add_argument("log_dir_name", type=str)
+parser.add_argument("data_dir_name",type=str,)
+parser.add_argument("--freq", type=int, default=10)
+parser.add_argument("--exptime", type=int, default=13)
+parser.add_argument("--device", type=str, default="cpu")
+parser.add_argument("--open_ratio", type=float, default=1.0)
+parser.add_argument("--beta", type=int, default=20)
+parser.add_argument("--ckpt_idx", type=int, default=-1)
+args = parser.parse_args()
 
 class RTControl(RTCore):
     def __init__(self, args):
@@ -68,14 +79,24 @@ class RTControl(RTCore):
         stdev = params["data"]["stdev"] * (params["data"]["vmax"] - params["data"]["vmin"])
         
         img_bounds = [0.0,255.0]
-        self.arm_state_bounds = np.load(f"../data/param/arm_state_bound.npy")
+        tactile_img_bounds = [0.0, 255.0]
+        data_dir_path = f"{args.data_dir_name}"
+        self.arm_state_bounds = np.load(f"{data_dir_path}/data/arm_state_bound.npy")
 
         self.eye_img_size = params["data"]["eye_img_size"]
         self.processor = Processor(img_bounds, self.arm_state_bounds, minmax)
-        model_name = params["model"]["model_name"]
+        # model_name = params["model"]["model_name"]
 
-        selector = RTSelector(params, device)
-        self.model = selector.select_model()    # モデルを取得
+        # selector = RTSelector(params, device)
+        self.model = TACTILESARNN(
+            rec_dim=params["rec_dim"],
+            joint_dim=9,
+            k_dim=params["k_dim"],
+            k_dim_tactile=params["k_dim_tactile"],
+            heatmap_size=params["heatmap_size"],
+            temperature=params["temperature"],
+            im_size=[64, 64], 
+        )
 
         """
         numpyのエラーが発生する場合, 実行環境のnumpyのバージョンが1系であることが原因
@@ -88,7 +109,7 @@ class RTControl(RTCore):
         self.model.eval()
         
         self.deprocessor = Deprocessor(img_bounds, self.arm_state_bounds, minmax, select_idxs=[0,])
-        self.key_dim = params["model"]["key_dim"]
+        self.key_dim = params["key_dim"]
         
         self.beta = args.beta
         
@@ -173,87 +194,100 @@ class RTControl(RTCore):
             state_dict = {"key": None, "vec": None, "union": None}
             # state_dict = None
             y_vec_hat_list, y_img1_hat_list = [], []
+            y_tactile_img_hat_list = []
             
             for loop_ct in range(self.nloop):
-                # 明るさ調節用
-                # right_img = cv2.convertScaleAbs(self.right_img, alpha=1, beta=self.beta)
-                
-                right_img = self.right_img#right_img(H,W,C)
-                rt_right_eye_imgs = np.expand_dims(right_img, axis=[0,1])#rt_right_eye_imgs(B,S,C,H,W)で(1,1,3,64,64)
+                # 1. get data 
+                right_img = self.right_img # (H,W,C)
+                tactile_img = self.tactile_img # (H,W,C)
+
+                # 2. expand dimensions
+                rt_right_eye_imgs = np.expand_dims(right_img, axis=[0,1]) # rt_right_eye_imgs(B,S,C,H,W)で(1,1,3,64,64)
                 rt_vecs = np.expand_dims(np.clip(self.right_arm_state, 
                                                  self.arm_state_bounds[0], 
                                                  self.arm_state_bounds[1]), axis=[0,1])
-                
+                rt_tactile_imgs = np.expand_dims(tactile_img, axis=[0,1])
+
+                # 3. normalize & resize
                 _rt_right_eye_imgs = self.processor.process_imgs(rt_right_eye_imgs, resize=self.eye_img_size)
                 _rt_vecs = self.processor.process_vecs(rt_vecs)
-                
+                _rt_tactile_imgs = self.processor.process_imgs(rt_tactile_imgs, resize=self.eye_img_size)
+
+                # 4. numpy to Tensor                
                 x_eye_img1 = torch.Tensor(_rt_right_eye_imgs[:,0]).to(torch.float32)
                 x_vec = torch.Tensor(_rt_vecs[:,0]).to(torch.float32)
+                x_tactile = torch.Tensor(_rt_tactile_imgs[:,0]).to(torch.float32).to(self.device)
                 
-                # 前stepで予測した値を一定割合混ぜ合わせている
+                # 5. 前stepで予測した値を一定割合混ぜ合わせている
                 if loop_ct > 0:
-                    # x_eye_img1 = self.open_ratio * x_eye_img1 + (1.0 - self.open_ratio) * y_img1_hat_list[-1]
                     x_vec = self.open_ratio * x_vec + (1.0 - self.open_ratio) * y_vec_hat_list[-1]
                 
-                (y_eye_img1_hat,
-                 y_vec_hat, 
-                 enc_eye_key1, dec_eye_key1, 
-                 enc_eye_key_map1,
-                 state_dict) = self.model(x_eye_img1, x_vec, state_dict)
+                # 6. inference
+                y_eye_img1_hat, y_vec_hat, enc_eye_key1, dec_eye_key1, state, y_image_tactile, enc_tactile_pts, dec_tactile_pts = self.model(x_eye_img1, x_vec, x_tactile, state)#
                 
                 y_vec_hat_list.append(y_vec_hat)
-                y_img1_hat_list.append(y_eye_img1_hat)
+                # y_img1_hat_list.append(y_eye_img1_hat)
                 
+                # 7. deprocess(visualization & transformation of target value)
+                # --- eye image ---
                 y_eye_img1_hat = y_eye_img1_hat.unsqueeze(dim=1)
-                y_vec_hat = y_vec_hat.unsqueeze(dim=1)
-                
                 enc_eye_key1 = enc_eye_key1.unsqueeze(dim=1)
                 dec_eye_key1 = dec_eye_key1.unsqueeze(dim=1)
                 
+                # key point coordinate transform
                 enc_eye_key1 = self.deprocessor.deprocess_key(enc_eye_key1, self.eye_img_size)[0,0]
                 dec_eye_key1 = self.deprocessor.deprocess_key(dec_eye_key1, self.eye_img_size)[0,0]
                 
-                pred_eye_img1 = self.deprocessor.deprocess_img(y_eye_img1_hat)[0,0].copy()
-                pred_vec = self.deprocessor.deprocess_vec(y_vec_hat)[0,0].copy()
-                
                 curr_eye_img1 = self.deprocessor.deprocess_img(x_eye_img1.unsqueeze(1))[0,0].copy()
-                curr_vec = self.deprocessor.deprocess_vec(x_vec.unsqueeze(1))[0,0].copy()
+                pred_eye_img1 = self.deprocessor.deprocess_img(y_eye_img1_hat)[0,0].copy()
                 
+                # ---tactile image ---
+                y_image_tactile_hat = y_image_tactile_hat.unsqueeze(dim=1)
+                enc_tactile_pts = enc_tactile_pts.unsqueeze(dim=1)
+                dec_tactile_pts = dec_tactile_pts.unsqueeze(dim=1)
+                
+                # key point coordinate transform
+                enc_tactile_pts = self.deprocessor.deprocess_key(enc_tactile_pts, self.tactile_img_size)[0,0]
+                dec_tactile_pts = self.deprocessor.deprocess_key(dec_tactile_pts, self.tactile_img_size)[0,0]
+                
+                curr_tactile_img = self.deprocessor.deprocess_img(x_tactile.unsqueeze(1))[0,0].copy()
+                pred_tactile_img = self.deprocessor.deprocess_img(y_image_tactile_hat)[0,0].copy()
+                
+                pred_vec = self.deprocessor.deprocess_vec(y_vec_hat.unsqueeze(dim=1))[0,0].copy()
+               
+                curr_vec = self.deprocessor.deprocess_vec(x_vec.unsqueeze(1))[0,0].copy()
+
+                # 8. animation  
                 for i in range(self.key_dim):
                     cv2.circle(curr_eye_img1, tuple(enc_eye_key1[i]), 1, (255,0,0), thickness=-1)
                     cv2.circle(curr_eye_img1, tuple(dec_eye_key1[i]), 1, (0,0,255), thickness=-1)
+                for i in range(self.key_dim_tactile):
+                # 青: 入力時の注目点, 赤: 予測された次時刻の注目点
+                    cv2.circle(curr_tactile_img, tuple(enc_tactile_pts[i]), 2, (255,0,0), thickness=-1)
+                    cv2.circle(curr_tactile_img, tuple(dec_tactile_pts[i]), 2, (0,0,255), thickness=-1)
+                row_eye = np.concatenate((curr_eye_img1, pred_eye_img1), axis=1)
+                row_tactile = np.concatenate((curr_tactile_img, pred_tactile_img), axis=1)
+                out_img = np.concatenate((row_eye, row_tactile), axis=0)
                 
-                out_img = np.concatenate((curr_eye_img1, pred_eye_img1), axis=1)
-                # out_img_msg = self.bridge.cv2_to_imgmsg(out_img, encoding="bgr8")
                 out_img_msg = self.cv2_to_imgmsg(out_img)
                 self.pred_img_pub.publish(out_img_msg)
 
+                # 9. control AIREC-Basic
                 self.right_arm_msg.header.stamp = rospy.Time.now()
                 tar_right_pos = np.clip(np.round(pred_vec), self.arm_state_bounds[0], self.arm_state_bounds[1])
-                
                 self.right_arm_msg.position = tar_right_pos
                 
                 # ipdb.set_trace()
                 if loop_ct > 10:
                     self.right_arm_pub.publish(self.right_arm_msg)
                 
-                print(f"{loop_ct}: pred: {np.round(pred_vec)[-1]}")
+                print(f"Step {loop_ct}: Joint[0]={np.round(pred_vec)[0]:.1f}")
                 self.r.sleep()
         else:
             print("check joint publish!")
             exit()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--log_dir_name", type=str, default="20250407_2036_12")
-    parser.add_argument("--freq", type=int, default=10)
-    parser.add_argument("--exptime", type=int, default=13)
-    parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--open_ratio", type=float, default=1.0)
-    parser.add_argument("--beta", type=int, default=20)
-    parser.add_argument("--ckpt_idx", type=int, default=-1)
-    args = parser.parse_args()
-    
+if __name__ == "__main__":    
     try:
         rospy.init_node("task_node", anonymous=True)
         task = RTControl(args)
@@ -261,16 +295,6 @@ if __name__ == "__main__":
         task.run()
         sys.exit()
     except rospy.ROSInterruptException or KeyboardInterrupt or EOFError as e:
-        init_exptime=3
-        init_freq=100
-        nloop = init_exptime * init_freq
-        
-        current_position = np.array(task.upper_msg.position)
-        target_position = np.array(task.upper_msg.position)
-        target_position[11] = 223
-        
-        trajectory = np.linspace(current_position, target_position , nloop)
-        for i in range(nloop):        
-            task.upper_msg.header.stamp = rospy.Time.now()
-            task.upper_msg.position = trajectory[i]
-            time.sleep(1./init_freq)
+        print(f"Terminated: {e}")
+
+        pass

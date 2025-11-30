@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../../eipl")
 from model import E1CamSARNN
 from model import E1CamHSARNN
 from model import E1CamEffHSARNN
@@ -29,6 +31,7 @@ from model import E2H1CamHSARNNCBAMx2DCNv3BlockEnc
 
 from model import E2H2CamHSARNNSENetEnc
 from model import E2H2CamHSARNNDCNv3SENetEnc
+from model import TACTILESARNN
 
 import torch
 import ipdb

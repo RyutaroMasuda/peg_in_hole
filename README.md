@@ -141,7 +141,7 @@ TensorBoard 2.14.0 at http://localhost:6006/ (Press CTRL+C to quit)
 ### 7. 6.test.pyの実行
 オフラインテストを行うコード
 その他のinputの画像はtrainから持ってくる（コードを書き換える必要あり）
-ココらへんを変える
+以下のディレトリリpathをinputしたい物変更
 ```
 _images=np.load("./data/20251112_redsylinder/test/right_imgs.npy")
 _joints=np.load("./data/20251112_redsylinder/test/right_arm_states.npy")
@@ -150,6 +150,15 @@ _images_tactile=np.load("./data/20251112_redsylinder/test/right_digit_imgs.npy")
 実行
 ```
 uv run bin/6_test.py --filename log/20251125/2026/57/SARNN.pth
+```
+
+### 8. 推論(rt_control.pyの実行)
+rt_controlはrt_coreを継承し
+
+```
+uv run rt_control.py <log_dir_name> <data_dir_name>
+
+uv run rt_control.py log/20251128_1910_42 data/20251112_redsylinder2
 ```
 
 # 記録

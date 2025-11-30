@@ -51,7 +51,7 @@ parser.add_argument("--compile", action="store_true")
 parser.add_argument("--tag", help="Tag name for snap/log sub directory")
 args = parser.parse_args()
 
-# check args
+# check args. args.json is made at this point
 args = check_args(args)
 
 # calculate the noise level (variance) from the normalized range

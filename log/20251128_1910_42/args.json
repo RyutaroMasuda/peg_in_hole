@@ -10,7 +10,7 @@
     "k_dim_tactile": 5,
     "log_dir": "log/",
     "lr": 0.001,
-    "model": "sarnn",
+    "model": "tactilesarnn",
     "optimizer": "adam",
     "pt_loss": 0.1,
     "pt_tactile_loss": 0.1,

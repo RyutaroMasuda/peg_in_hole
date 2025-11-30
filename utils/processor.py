@@ -17,6 +17,9 @@ from layer import FoveaProcessor
 
 
 class Processor:
+    """ 
+    画像とベクトルの正規化、reshapeを行う
+    """
     def __init__(
         self, 
         img_bounds,
