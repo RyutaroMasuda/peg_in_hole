@@ -1,5 +1,6 @@
-## コードチート表
+# TACTILE_SARNN
 基本的に[eipl](https://ogata-lab.github.io/eipl-docs/en/teach/dataset/)のコードをベースに作成
+このリポジトリはTACTILE_SARNNモデルでAIREC-Basicにpeg_in_holeタスクを実行させるためのものです。
 
 ### 0. ディレクトリの作成と移動
 
