@@ -18,7 +18,7 @@ import ipdb
 import glob
 from natsort import natsorted
 from scipy.interpolate import CubicSpline
-
+sys.path.append("../eipl")
 from eipl.utils import normalization
 from eipl.utils import restore_args, tensor2numpy, deprocess_img
 
@@ -31,9 +31,15 @@ from std_msgs.msg import Header
 # from cv_bridge import CvBridge, CvBridgeError
 
 from rt_core import RTCore
-
 # local
-sys.path.append("../")
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0,str(ROOT))
+EIPL_ROOT = ROOT.parent / "eipl"
+for p in (ROOT, EIPL_ROOT):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 from utils import Visualize, Processor, Deprocessor, RTSelector
 from eipl.model import TACTILESARNN
 
@@ -68,22 +74,22 @@ class RTControl(RTCore):
             device = "cpu"
         
         # ../log/dir_name/から，args.jsonを読み込み
-        log_dir_path = f"../log/{args.log_dir_name}"
+        log_dir_path = f"./{args.log_dir_name}"
         try:
             params = restore_args(os.path.join(log_dir_path, "args.json"))
         except FileNotFoundError as e:
             print("no such file!")
             exit()
         
-        minmax = [params["data"]["vmin"], params["data"]["vmax"]]
-        stdev = params["data"]["stdev"] * (params["data"]["vmax"] - params["data"]["vmin"])
+        minmax = [params["vmin"], params["vmax"]]
+        # stdev = params["data"]["stdev"] * (params["data"]["vmax"] - params["data"]["vmin"])
         
         img_bounds = [0.0,255.0]
         tactile_img_bounds = [0.0, 255.0]
         data_dir_path = f"{args.data_dir_name}"
-        self.arm_state_bounds = np.load(f"{data_dir_path}/data/arm_state_bound.npy")
+        self.arm_state_bounds = np.load(f"{data_dir_path}/data/right_joint_bounds.npy",allow_pickle=True)
 
-        self.eye_img_size = params["data"]["eye_img_size"]
+        self.eye_img_size = [64,64]
         self.processor = Processor(img_bounds, self.arm_state_bounds, minmax)
         # model_name = params["model"]["model_name"]
 
@@ -109,7 +115,7 @@ class RTControl(RTCore):
         self.model.eval()
         
         self.deprocessor = Deprocessor(img_bounds, self.arm_state_bounds, minmax, select_idxs=[0,])
-        self.key_dim = params["key_dim"]
+        self.key_dim = params["k_dim"]
         
         self.beta = args.beta
         

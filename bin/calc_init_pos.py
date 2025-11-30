@@ -2,16 +2,22 @@
 import numpy as np
 import glob
 import os
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("npz_dir",type=str)
+args=parser.parse_args()
 
 # すべてのposディレクトリのnpzファイルを取得
-npz_files = glob.glob('./data/20250510/npy/pos*/**/*.npz', recursive=True)
+npz_files = glob.glob(f'./{args.npz_dir}/pos*/*.npz', recursive=True)
+import ipdb;ipdb.set_trace()
 print(f"Found {len(npz_files)} npz files")
 
 all_joints = []
 
 for file in npz_files:
     try:
-        data = np.load(file)
+        data = np.load(file, allow_pickle=True)
         print(f"Processing {file}")
         print(f"Keys: {list(data.keys())}")
         
