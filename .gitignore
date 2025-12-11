@@ -9,6 +9,7 @@ wheels/
 *.npy
 *.npz
 *.bag
+*.mp4
 
 # Virtual environments
 .venv
