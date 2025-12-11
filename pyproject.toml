@@ -1,0 +1,24 @@
+[project]
+name = "pick-plug"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.8,<3.9"
+dependencies = [
+    "gdown>=5.2.0",
+    "gnupg>=2.3.1",
+    "imageio>=2.35.1",
+    "ipdb>=0.13.13",
+    "matplotlib>=3.7.5",
+    "natsort>=8.4.0",
+    "opencv-python==4.11.0.86",
+    "pillow>=10.4.0",
+    "protobuf>=3.20,<4",
+    "pycryptodome==3.23.0",
+    "pycryptodomex>=3.10",
+    "rospkg==1.6.0",
+    "tensorboard>=2.14.0",
+    "torch>=2.4.1",
+    "torchvision>=0.19.1",
+    "tqdm>=4.67.1",
+]
