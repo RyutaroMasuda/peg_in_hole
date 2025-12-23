@@ -28,10 +28,10 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("train_data_dir", type=str)
 parser.add_argument("--model", type=str, default="sarnn")
-parser.add_argument("--epoch", type=int, default=10000)
-parser.add_argument("--batch_size", type=int, default=15)
+parser.add_argument("--epoch", type=int, default=30000)
+parser.add_argument("--batch_size", type=int, default=10)
 parser.add_argument("--rec_dim", type=int, default=50)
-parser.add_argument("--k_dim", type=int, default=10)
+parser.add_argument("--k_dim", type=int, default=6)
 parser.add_argument("--img_loss", type=float, default=0.5)
 parser.add_argument("--joint_loss", type=float, default=1.0)
 parser.add_argument("--pt_loss", type=float, default=0.1)
@@ -62,8 +62,8 @@ else:
 
 # load dataset
 right_images_raw = np.load(f"{args.train_data_dir}/train/right_imgs.npy")
-right_joints_raw = np.load(f"{args.train_data_dir}/train/right_arm_states.npy")
-right_joint_bounds = np.load(f"{args.train_data_dir}/data/right_joint_bounds.npy")
+right_joints_raw = np.load(f"{args.train_data_dir}/train/teleop_right_arm_states.npy")
+right_joint_bounds = np.load(f"{args.train_data_dir}/data/teleop_right_joint_bounds.npy")
 # right_tactile_images = np.load(f"{args.train_data_dir}/train/right_digit_imgs.npy")
 
 # normalize data
@@ -91,7 +91,7 @@ print("[DEBUG] test images_raw shape:", right_images.shape)
 print("[DEBUG] test joints_raw shape:", right_joints.shape)
 
 right_images_raw = np.load(f"{args.train_data_dir}/test/right_imgs.npy")
-right_joints_raw = np.load(f"{args.train_data_dir}test/right_arm_states.npy")
+right_joints_raw = np.load(f"{args.train_data_dir}test/teleop_right_arm_states.npy")
 
 right_images = normalization(right_images_raw.transpose(0,1,4,2,3), (0, 255), minmax)
 right_joints = normalization(right_joints_raw, right_joint_bounds, minmax)
@@ -163,6 +163,7 @@ with tqdm(range(args.epoch)) as pbar_epoch:
         save_ckpt, _ = early_stop(test_results['total_loss'])
 
         if save_ckpt:
+            save_name = os.path.join(log_dir_path, f"SARNN{epoch}.pth")
             trainer.save(epoch, [train_results['total_loss'], test_results['total_loss']], save_name)
             print(f"保存されているepoch:{epoch}")
 

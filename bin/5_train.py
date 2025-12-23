@@ -26,13 +26,14 @@ from fullBPTT import fullBPTTtrainerTactile#学習用自作コード
 parser = argparse.ArgumentParser(
     description="Learning spatial autoencoder with recurrent neural network"
 )
+ckpt_count = 0
 parser.add_argument("train_data_dir", type=str)
 parser.add_argument("--model", type=str, default="sarnn")
-parser.add_argument("--epoch", type=int, default=10000)
-parser.add_argument("--batch_size", type=int, default=15)
+parser.add_argument("--epoch", type=int, default=30000)
+parser.add_argument("--batch_size", type=int, default=12)
 parser.add_argument("--rec_dim", type=int, default=50)
-parser.add_argument("--k_dim", type=int, default=6)
-parser.add_argument("--k_dim_tactile", type=int, default=5)
+parser.add_argument("--k_dim", type=int, default=10)
+parser.add_argument("--k_dim_tactile", type=int, default=10)
 parser.add_argument("--img_loss", type=float, default=0.5)
 parser.add_argument("--joint_loss", type=float, default=1.0)
 parser.add_argument("--tactile_loss", type=float, default=0.5)
@@ -46,7 +47,7 @@ parser.add_argument("--optimizer", type=str, default="adam")
 parser.add_argument("--log_dir", default="log/")
 parser.add_argument("--vmin", type=float, default=0.0)
 parser.add_argument("--vmax", type=float, default=1.0)
-parser.add_argument("--device", type=int, default=4)
+parser.add_argument("--device", type=int, default=1)
 parser.add_argument("--compile", action="store_true")
 parser.add_argument("--tag", help="Tag name for snap/log sub directory")
 args = parser.parse_args()
@@ -63,20 +64,20 @@ if args.device >= 0:
 else:
     device = "cpu"
 
-# load dataset
+# ------- load train dataset -------
 right_images_raw = np.load(f"{args.train_data_dir}/train/right_imgs.npy")
-right_joints_raw = np.load(f"{args.train_data_dir}/train/right_arm_states.npy")
-right_joint_bounds = np.load(f"{args.train_data_dir}/data/right_joint_bounds.npy")
+right_joints_raw = np.load(f"{args.train_data_dir}/train/teleop_right_arm_states.npy")
+right_joint_bounds = np.load(f"{args.train_data_dir}/data/teleop_right_joint_bounds.npy")
 right_tactile_images = np.load(f"{args.train_data_dir}/train/right_digit_imgs.npy")
 
-# normalize data
+# ------- normalize train data -------
 minmax = [args.vmin, args.vmax]
 
 right_images = normalization(right_images_raw.transpose(0,1,4,2,3), (0, 255), minmax)
 right_joints = normalization(right_joints_raw, right_joint_bounds, minmax)
 right_tactile_images = normalization(right_tactile_images.transpose(0,1,4,2,3), (0, 255), minmax)
 
-# add gaussian noize for getting robust data
+# ------- add gaussian noize for getting robust data --------
 train_dataset = MultimodalDatasetTactile(right_images, right_joints, right_tactile_images, device=device, stdev=stdev)
 
 print("[DEBUG] creating train loader...")
@@ -90,24 +91,22 @@ train_loader = torch.utils.data.DataLoader(
 )
 
 print("[DEBUG] loading test data...")
-print("[DEBUG] test images_raw shape:", right_images.shape)
-print("[DEBUG] test joints_raw shape:", right_joints.shape)
+print("[DEBUG] train images_raw shape:", right_images.shape)
+print("[DEBUG] train joints_raw shape:", right_joints.shape)
 
+# ------- load test dataset -------
 right_images_raw = np.load(f"{args.train_data_dir}/test/right_imgs.npy")
-right_joints_raw = np.load(f"{args.train_data_dir}test/right_arm_states.npy")
+right_joints_raw = np.load(f"{args.train_data_dir}test/teleop_right_arm_states.npy")
 right_tactile_images =  np.load(f"{args.train_data_dir}/test/right_digit_imgs.npy")
 
+# ------- normalize test data -------
 right_images = normalization(right_images_raw.transpose(0,1,4,2,3), (0, 255), minmax)
 right_joints = normalization(right_joints_raw, right_joint_bounds, minmax)
 right_tactile_images = normalization(right_tactile_images.transpose(0,1,4,2,3), (0, 255), minmax)
 
-print("[DEBUG] test image shape after transpose:", right_images.shape)
-print("[DEBUG] image min/max:", right_images.min(), right_images.max())
-
-print("[DEBUG] creating test dataset...")
+# ------- add gaussian noize for getting robust data -------
 test_dataset = MultimodalDatasetTactile(right_images, right_joints, right_tactile_images, device=device, stdev=None)
 
-print("[DEBUG] creating test loader...")
 test_loader = torch.utils.data.DataLoader(
     test_dataset,
     batch_size=args.batch_size,
@@ -116,10 +115,7 @@ test_loader = torch.utils.data.DataLoader(
     num_workers=0
 )
 
-print("[DEBUG] defining model...")
-
-
-# define model
+# ------- define model -------
 model = TACTILESARNN(
     rec_dim=args.rec_dim,
     joint_dim=9,
@@ -171,6 +167,7 @@ with tqdm(range(args.epoch)) as pbar_epoch:
         save_ckpt, _ = early_stop(test_results['total_loss'])
 
         if save_ckpt:
+            save_name = os.path.join(log_dir_path, f"SARNN{epoch}.pth")
             trainer.save(epoch, [train_results['total_loss'], test_results['total_loss']], save_name)
             print(f"保存されているepoch:{epoch}")
 

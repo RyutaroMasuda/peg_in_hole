@@ -160,3 +160,12 @@ uv run bin/6_test.py --filename log/20251125/2026/57/SARNN.pth
     right_imgs = npz_data["right_imgs"][np.newaxis,:,55:-110,155:-50,:]
     ```
     で切り抜き
+- 20251112_redsylinder_2
+    ```
+    [np.newaxis,:,55:-110,205:-55,:]
+    ```
+- red_sylinder 
+    右目＋触覚画像のみのrosbagを取り直した
+    ```
+    [np.newaxis,:,55:-110,205:-55,:]
+    ```

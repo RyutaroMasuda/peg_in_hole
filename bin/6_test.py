@@ -45,18 +45,18 @@ idx = int(args.idx)
 # load dataset
 minmax = [params["vmin"], params["vmax"]]
 grasp_data = SampleDownloader("airec", "grasp_bottle", img_format="HWC")
-_images=np.load("./data/20251112_redsylinder2/test/right_imgs.npy")
-#_images=np.load("./data/20250710/test/right_imgs.npy")
-_joints=np.load("./data/20251112_redsylinder2/test/right_arm_states.npy")
+# _images=np.load("./data/20251112_redsylinder2/test/right_imgs.npy")
+_images=np.load("./data/20251218_greenrectangular/test/right_imgs.npy")
+_joints=np.load("./data/20251218_greenrectangular/test/right_arm_states.npy")
 #_joints=np.load("./data/20250710/test/right_arm_states.npy")
-_images_tactile=np.load("./data/20251112_redsylinder2/test/right_digit_imgs.npy")
+_images_tactile=np.load("./data/20251218_greenrectangular/test/right_digit_imgs.npy")
 # _images = resize_img(_images, (64, 64)) #make_dataset.py時にすでにやってる気がする
 # _images_tactile = resize_img(_images_tactile,(64,64))
 images = _images[idx]
 joints = _joints[idx]
 images_tactile = _images_tactile[idx]
 # prepare joint_bounds correctly
-joint_bounds_raw = np.load("./data/20251112_redsylinder2/test/teleop_right_arm_states.npy")
+joint_bounds_raw = np.load("./data/20251218_greenrectangular/test/teleop_right_arm_states.npy")
 #joint_bounds_raw = np.load("./data/20250710/test/teleop_right_arm_states.npy")
 joint_bounds_min = joint_bounds_raw.min(axis=(0, 1))
 joint_bounds_max = joint_bounds_raw.max(axis=(0, 1))
